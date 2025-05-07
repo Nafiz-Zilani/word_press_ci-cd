@@ -1,42 +1,35 @@
-name: Deploy Website to Nginx Server
+name: Deploy to Nginx
 
 on:
   push:
-    branches: [ main ]  # Trigger deployment when code is pushed to the main branch
-  pull_request:
-    branches: [ main ]  # Optionally run on pull requests to test deployment
-  workflow_dispatch:    # Allow manual triggering of the workflow
+    branches: [ main ]
 
 jobs:
   deploy:
     runs-on: self-hosted
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-      
-    - name: Deploy to Nginx
+
+    # - name: Install Nginx (if not installed)
+    #   run: |
+    #     if ! command -v nginx > /dev/null; then
+    #       sudo apt update
+    #       sudo apt install nginx -y
+    #     else
+    #       echo "Nginx is already installed."
+    #     fi
+
+    - name: Clean old Nginx HTML files
       run: |
-        # Create a backup of the current deployment
-        sudo mkdir -p /var/backups/website
-        sudo cp -r ${{ vars.NGINX_ROOT_DIR }}/* /var/backups/website/ || true
-        
-        # Deploy the files to Nginx web root
-        sudo mkdir -p ${{ vars.NGINX_ROOT_DIR }}
-        sudo cp -r ./* ${{ vars.NGINX_ROOT_DIR }}/
-        
-        # Set proper ownership and permissions
-        sudo chown -R www-data:www-data ${{ vars.NGINX_ROOT_DIR }}/
-        sudo chmod -R 755 ${{ vars.NGINX_ROOT_DIR }}/
-        
-        # Reload Nginx to apply any configuration changes
+        sudo rm -rf /var/www/html/*
+    
+    - name: Copy site to Nginx web root
+      run: |
+        sudo cp -r ./* /var/www/html/
+        sudo chown -R www-data:www-data /var/www/html
+
+    - name: Reload Nginx
+      run: |
         sudo systemctl reload nginx
-      
-    - name: Verify deployment
-      run: |
-        echo "Deployment completed! Verifying website is accessible..."
-        curl -sSf http://localhost > /dev/null || (echo "Website verification failed" && exit 1)
-        echo "Website successfully deployed and verified!
-        
-        # Log the deployment
-        echo "Website deployed at $(date)" >> /var/log/website-deployments.log
